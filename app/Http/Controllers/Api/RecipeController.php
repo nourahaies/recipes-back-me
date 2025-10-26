@@ -7,6 +7,7 @@ use App\Models\Recipe;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class RecipeController extends Controller
 {
@@ -36,11 +37,16 @@ class RecipeController extends Controller
                 'ingredients' => 'array',
             ]);
 
+
             // رفع الصورة إن وُجدت
             if ($request->hasFile('image')) {
                 $imagePath = $request->file('image')->store('recipes', 'public');
                 $data['image'] = $imagePath;
             }
+
+//            if (!Storage::disk('public')->exists($imagePath)) {
+//                throw new \Exception('Image was not saved!');
+//            }
 
             $recipe = Recipe::create($data);
 
@@ -111,10 +117,19 @@ class RecipeController extends Controller
             $data = $request->validate([
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
-                'image' => 'nullable|string',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'category_id' => 'required|exists:categories,id',
                 'ingredients' => 'array',
             ]);
+
+            // إذا تم رفع صورة جديدة، نحذف القديمة ونرفع الجديدة
+            if ($request->hasFile('image')) {
+                if ($recipe->image && Storage::disk('public')->exists($recipe->image)) {
+                    Storage::disk('public')->delete($recipe->image);
+                }
+                $imagePath = $request->file('image')->store('recipes', 'public');
+                $data['image'] = $imagePath;
+            }
 
             $recipe->update($data);
 
@@ -133,6 +148,7 @@ class RecipeController extends Controller
             return $this->errorResponse($e->getMessage());
         }
     }
+
 
     // حذف وصفة
     public function destroy($id)
